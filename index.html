@@ -21,8 +21,11 @@
             background-color: var(--dark-bg);
             color: white;
             margin: 0;
-            padding-top: calc(15vh + 20px);
-            text-align: center;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
 
         /* الإعلان العلوي الثابت */
@@ -41,7 +44,12 @@
         }
         .ad-container img { height: 100%; width: auto; max-width: 100%; object-fit: contain; }
 
-        .container { max-width: 600px; margin: auto; padding: 20px; }
+        .container { 
+            max-width: 600px; 
+            margin: calc(15vh + 30px) auto 30px; 
+            padding: 20px; 
+            width: 90%;
+        }
 
         .card {
             background: var(--card-bg);
@@ -62,6 +70,7 @@
             background: #0f172a;
             color: white;
             font-size: 1rem;
+            box-sizing: border-box;
         }
 
         .btn-analyze {
@@ -80,12 +89,10 @@
 
         .btn-analyze:hover { transform: scale(1.02); box-shadow: 0 0 20px var(--primary); }
 
-        /* لودر التحليل */
         .loader { display: none; margin: 40px 0; }
         .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top-color: var(--danger); border-radius: 50%; animation: spin 1s infinite linear; margin: auto; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* شبكة النتائج */
         .results-grid {
             display: none;
             grid-template-columns: 1fr 1fr;
@@ -101,19 +108,23 @@
             animation: fadeIn 0.5s ease-in forwards;
         }
 
-        .res-card img { width: 100%; height: 150px; object-fit: cover; }
+        .res-card img { width: 100%; height: 150px; object-fit: cover; background: #000; }
         .res-info { padding: 15px; }
         .res-info b { color: var(--danger); display: block; margin-bottom: 5px; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        @media (max-width: 500px) { .results-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 500px) { 
+            .results-grid { grid-template-columns: 1fr; }
+            .logo { font-size: 1.8rem; }
+            .card { padding: 25px; }
+        }
     </style>
 </head>
 <body>
 
     <div class="ad-container">
-        <img id="adImg" src="https://via.placeholder.com/800x200?text=إعلان+ألعاب+زمان" alt="Ad">
+        <img id="adImg" src="https://via.placeholder.com/800x200?text=جاري+تحميل+الإعلان" alt="Ad">
     </div>
 
     <div class="container">
@@ -126,14 +137,14 @@
             </div>
 
             <input type="text" id="userName" class="form-control" placeholder="أدخل اسمك الكامل">
-            <input type="file" id="userFile" class="form-control">
+            <input type="file" id="userFile" class="form-control" accept="image/*">
             
             <button class="btn-analyze" onclick="startProcess()">تحليل الملامح الآن 🚀</button>
         </div>
 
         <div class="loader" id="loader">
             <div class="spinner"></div>
-            <p id="loaderText">جاري مسح أبعاد الوجه...</p>
+            <p id="loaderText" style="margin-top: 15px;">جاري مسح أبعاد الوجه...</p>
         </div>
 
         <div class="results-grid" id="results"></div>
@@ -142,7 +153,6 @@
     <script>
         const API_URL = window.location.origin;
 
-        // قاعدة البيانات "البائسة"
         const database = {
             jobs: [
                 { t: "منظف خزانات وقود", i: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
@@ -163,19 +173,18 @@
 
         async function startProcess() {
             const name = document.getElementById('userName').value;
-            if(!name) return alert("اكتب اسمك أولاً!");
+            if(!name) { alert("اكتب اسمك أولاً!"); return; }
 
             document.getElementById('inputSection').style.display = 'none';
             document.getElementById('loader').style.display = 'block';
 
-            // إخطار البوت (لوحة التحكم)
             try {
                 await fetch(`${API_URL}/api/log`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ message: `🎮 ألعاب زمان: الضحية ${name} دخل المختبر!` })
+                    body: JSON.stringify({ message: `🎮 ألعاب زمان: الضحية ${name} دخل الاختبار!` })
                 });
-            } catch(e) {}
+            } catch(e) { console.log("Log error"); }
 
             let steps = ["تحليل العيون...", "فحص الجبهة...", "استخراج سوء الحظ..."];
             let i = 0;
@@ -185,11 +194,11 @@
 
             setTimeout(() => {
                 clearInterval(timer);
-                renderUglyResults(name);
+                renderUglyResults();
             }, 3500);
         }
 
-        function renderUglyResults(name) {
+        function renderUglyResults() {
             const categories = [
                 { l: "وظيفة المستقبل", d: database.jobs },
                 { l: "بيت الزوجية", d: database.houses },
@@ -202,7 +211,7 @@
                 const item = cat.d[Math.floor(Math.random() * cat.d.length)];
                 html += `
                 <div class="res-card">
-                    <img src="${item.i}">
+                    <img src="${item.i}" alt="${cat.l}">
                     <div class="res-info">
                         <b>${cat.l}</b>
                         <span>${item.t}</span>
@@ -215,15 +224,21 @@
             document.getElementById('results').innerHTML = html + `<button class="btn-analyze" onclick="location.reload()" style="grid-column: 1/-1">إعادة الاختبار (لعلك تنجو)</button>`;
         }
 
-        // جلب الإعلان من لوحة التحكم
         async function loadAd() {
             try {
                 const res = await fetch(`${API_URL}/api/config`);
+                if (!res.ok) throw new Error('Not found');
                 const data = await res.json();
-                if(data.ad.image) document.getElementById('adImg').src = data.ad.image;
-            } catch(e) {}
+                if(data.ad && data.ad.image) {
+                    document.getElementById('adImg').src = data.ad.image;
+                }
+            } catch(e) {
+                document.getElementById('adImg').src = "https://via.placeholder.com/800x200?text=أهلاً+بك+في+ألعاب+زمان";
+            }
         }
-        loadAd();
+        
+        window.onload = loadAd;
     </script>
 </body>
 </html>
+
