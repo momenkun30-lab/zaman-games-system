@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ألعاب زمان - اكتشف مصيرك 🎮</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --danger: #ff4757;
+            --dark-bg: #0f172a;
+            --card-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: var(--dark-bg);
+            color: white;
+            margin: 0;
+            padding-top: calc(15vh + 20px);
+            text-align: center;
+        }
+
+        /* الإعلان العلوي الثابت */
+        .ad-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 15vh;
+            background: #000;
+            z-index: 9999;
+            border-bottom: 3px solid var(--danger);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .ad-container img { height: 100%; width: auto; max-width: 100%; object-fit: contain; }
+
+        .container { max-width: 600px; margin: auto; padding: 20px; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo { font-size: 2.5rem; font-weight: 900; color: var(--primary); margin-bottom: 10px; }
+        
+        .form-control {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border: 1px solid #444;
+            background: #0f172a;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .btn-analyze {
+            background: linear-gradient(45deg, var(--primary), #8e44ad);
+            color: white;
+            border: none;
+            padding: 20px;
+            width: 100%;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+
+        .btn-analyze:hover { transform: scale(1.02); box-shadow: 0 0 20px var(--primary); }
+
+        /* لودر التحليل */
+        .loader { display: none; margin: 40px 0; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top-color: var(--danger); border-radius: 50%; animation: spin 1s infinite linear; margin: auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* شبكة النتائج */
+        .results-grid {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .res-card {
+            background: #1e293b;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid #333;
+            animation: fadeIn 0.5s ease-in forwards;
+        }
+
+        .res-card img { width: 100%; height: 150px; object-fit: cover; }
+        .res-info { padding: 15px; }
+        .res-info b { color: var(--danger); display: block; margin-bottom: 5px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 500px) { .results-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="ad-container">
+        <img id="adImg" src="https://via.placeholder.com/800x200?text=إعلان+ألعاب+زمان" alt="Ad">
+    </div>
+
+    <div class="container">
+        <div class="card" id="inputSection">
+            <div class="logo"><i class="fas fa-gamepad"></i> ألعاب زمان</div>
+            <p style="color: #94a3b8;">الذكاء الاصطناعي يحلل ملامحك ليتوقع مستقبلك</p>
+
+            <div style="margin: 25px 0;">
+                <i class="fas fa-user-circle fa-5x" style="color: #475569;"></i>
+            </div>
+
+            <input type="text" id="userName" class="form-control" placeholder="أدخل اسمك الكامل">
+            <input type="file" id="userFile" class="form-control">
+            
+            <button class="btn-analyze" onclick="startProcess()">تحليل الملامح الآن 🚀</button>
+        </div>
+
+        <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <p id="loaderText">جاري مسح أبعاد الوجه...</p>
+        </div>
+
+        <div class="results-grid" id="results"></div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        // قاعدة البيانات "البائسة"
+        const database = {
+            jobs: [
+                { t: "منظف خزانات وقود", i: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
+                { t: "صياد سمك في الخور", i: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=400" }
+            ],
+            houses: [
+                { t: "غرفة كرتون تحت الكبري", i: "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=400" },
+                { t: "بيت طين قديم مهجور", i: "https://images.unsplash.com/photo-1542601906990-b4d3fb773b09?w=400" }
+            ],
+            cars: [
+                { t: "عربة كارو بدون حمار", i: "https://images.unsplash.com/photo-1590234141861-6893693e507b?w=400" },
+                { t: "سيارة محروقة سكراب", i: "https://images.unsplash.com/photo-1506197061617-7f5c0b093236?w=400" }
+            ],
+            partners: [
+                { t: "شخصية قبيحة جداً ونكدية", i: "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=400" }
+            ]
+        };
+
+        async function startProcess() {
+            const name = document.getElementById('userName').value;
+            if(!name) return alert("اكتب اسمك أولاً!");
+
+            document.getElementById('inputSection').style.display = 'none';
+            document.getElementById('loader').style.display = 'block';
+
+            // إخطار البوت (لوحة التحكم)
+            try {
+                await fetch(`${API_URL}/api/log`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: `🎮 ألعاب زمان: الضحية ${name} دخل المختبر!` })
+                });
+            } catch(e) {}
+
+            let steps = ["تحليل العيون...", "فحص الجبهة...", "استخراج سوء الحظ..."];
+            let i = 0;
+            let timer = setInterval(() => {
+                if(i < steps.length) document.getElementById('loaderText').innerText = steps[i++];
+            }, 1000);
+
+            setTimeout(() => {
+                clearInterval(timer);
+                renderUglyResults(name);
+            }, 3500);
+        }
+
+        function renderUglyResults(name) {
+            const categories = [
+                { l: "وظيفة المستقبل", d: database.jobs },
+                { l: "بيت الزوجية", d: database.houses },
+                { l: "سيارة الأحلام", d: database.cars },
+                { l: "شريك العمر", d: database.partners }
+            ];
+
+            let html = '';
+            categories.forEach(cat => {
+                const item = cat.d[Math.floor(Math.random() * cat.d.length)];
+                html += `
+                <div class="res-card">
+                    <img src="${item.i}">
+                    <div class="res-info">
+                        <b>${cat.l}</b>
+                        <span>${item.t}</span>
+                    </div>
+                </div>`;
+            });
+
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('results').style.display = 'grid';
+            document.getElementById('results').innerHTML = html + `<button class="btn-analyze" onclick="location.reload()" style="grid-column: 1/-1">إعادة الاختبار (لعلك تنجو)</button>`;
+        }
+
+        // جلب الإعلان من لوحة التحكم
+        async function loadAd() {
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const data = await res.json();
+                if(data.ad.image) document.getElementById('adImg').src = data.ad.image;
+            } catch(e) {}
+        }
+        loadAd();
+    </script>
+</body>
+</html>
