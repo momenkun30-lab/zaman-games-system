@@ -1,44 +1,54 @@
-const { Telegraf } = require('telegraf');
 const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-
-const BOT_TOKEN = '8741320185:AAE2Y5Xv70PJWm4k-GMUO6FYub07wozYI2A';
-const ADMIN_ID = 8305841557; 
-
+const TelegramBot = require('node-telegram-bot-api');
+const path = require('path');
 const app = express();
-const bot = new Telegraf(BOT_TOKEN);
 
-app.use(cors());
-app.use(bodyParser.json());
+// إعدادات البوت - تم إضافة التوكن الخاص بك هنا
+const token = '8741320185:AAE2Y5Xv70PJWm4k-GMUO6FYub07wozYI2A'; 
+const bot = new TelegramBot(token, { polling: true });
 
-let currentAd = {
-    image: "https://via.placeholder.com/800x200?text=AD+SPACE",
-    active: true
+app.use(express.json());
+// إخبار السيرفر بمكان ملفات الموقع
+app.use(express.static(__dirname));
+
+// تخزين مؤقت للإعلان
+let siteConfig = {
+    ad: { image: "" }
 };
 
-// أوامر البوت
-bot.start((ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return;
-    ctx.reply("مرحباً بك! أرسل صورة لتغيير إعلان الموقع فوراً.");
+// تشغيل الواجهة الرئيسية (index.html)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-bot.on('photo', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return;
-    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-    const link = await ctx.telegram.getFileLink(fileId);
-    currentAd.image = link.href;
-    ctx.reply("✅ تم تحديث الإعلان في الموقع!");
-});
-
-// API للموقع
-app.get('/api/config', (req, res) => res.json({ ad: currentAd }));
-
+// استقبال الإشعارات من الموقع وإرسالها لك
 app.post('/api/log', (req, res) => {
-    bot.telegram.sendMessage(ADMIN_ID, req.body.message);
+    const { message } = req.body;
+    // تم إضافة الأيدي الخاص بك هنا لتصلك الرسائل
+    const chatId = '8305841557'; 
+    bot.sendMessage(chatId, message);
     res.sendStatus(200);
 });
 
+// جلب إعدادات الموقع (صورة الإعلان)
+app.get('/api/config', (req, res) => {
+    res.json(siteConfig);
+});
+
+// التحكم عبر البوت (تغيير الإعلان عند إرسال صورة)
+bot.on('photo', async (msg) => {
+    const chatId = msg.chat.id;
+    // التأكد أنك أنت فقط من يغير الإعلان
+    if (chatId.toString() === '8305841557') {
+        const photo = msg.photo[msg.photo.length - 1];
+        const fileLink = await bot.getFileLink(photo.file_id);
+        
+        siteConfig.ad.image = fileLink;
+        bot.sendMessage(chatId, "✅ تم تحديث الإعلان في الموقع بنجاح!");
+    }
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-bot.launch();
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
