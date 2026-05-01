@@ -123,8 +123,8 @@
 </head>
 <body>
 
-    <div class="ad-container">
-        <img id="adImg" src="https://via.placeholder.com/800x200?text=جاري+تحميل+الإعلان" alt="Ad">
+    <div class="ad-container" id="adBox">
+        <img id="adImg" src="https://via.placeholder.com/800x200?text=أهلاً+بك+في+ألعاب+زمان" alt="Ad">
     </div>
 
     <div class="container">
@@ -153,23 +153,27 @@
     <script>
         const API_URL = window.location.origin;
 
-        const database = {
-            jobs: [
-                { t: "منظف خزانات وقود", i: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
-                { t: "صياد سمك في الخور", i: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=400" }
-            ],
-            houses: [
-                { t: "غرفة كرتون تحت الكبري", i: "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=400" },
-                { t: "بيت طين قديم مهجور", i: "https://images.unsplash.com/photo-1542601906990-b4d3fb773b09?w=400" }
-            ],
-            cars: [
-                { t: "عربة كارو بدون حمار", i: "https://images.unsplash.com/photo-1590234141861-6893693e507b?w=400" },
-                { t: "سيارة محروقة سكراب", i: "https://images.unsplash.com/photo-1506197061617-7f5c0b093236?w=400" }
-            ],
-            partners: [
-                { t: "شخصية قبيحة جداً ونكدية", i: "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=400" }
-            ]
-        };
+        // دالة لجلب البيانات من السيرفر وتحديث الواجهة
+        async function loadSiteData() {
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const data = await res.json();
+
+                // 1. تحديث الإعلانات (عرض آخر إعلان نشط)
+                if (data.ads && data.ads.length > 0) {
+                    const latestAd = data.ads[data.ads.length - 1];
+                    document.getElementById('adImg').src = latestAd.image;
+                }
+
+                // 2. تحديث صور الموقع (إذا تم رفع صور من خيارات أكثر)
+                if (data.images && data.images.length > 0) {
+                    // هنا يمكننا جعل الصور المرفوعة تظهر كجزء من المحتوى
+                    console.log("صور الموقع المتوفرة:", data.images);
+                }
+            } catch (e) {
+                console.log("Error loading data:", e);
+            }
+        }
 
         async function startProcess() {
             const name = document.getElementById('userName').value;
@@ -199,21 +203,20 @@
         }
 
         function renderUglyResults() {
-            const categories = [
-                { l: "وظيفة المستقبل", d: database.jobs },
-                { l: "بيت الزوجية", d: database.houses },
-                { l: "سيارة الأحلام", d: database.cars },
-                { l: "شريك العمر", d: database.partners }
+            const defaultDatabase = [
+                { l: "وظيفة المستقبل", t: "منظف خزانات وقود", i: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
+                { l: "بيت الزوجية", t: "غرفة كرتون تحت الكبري", i: "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=400" },
+                { l: "سيارة الأحلام", t: "عربة كارو بدون حمار", i: "https://images.unsplash.com/photo-1590234141861-6893693e507b?w=400" },
+                { l: "شريك العمر", t: "شخصية نكدية جداً", i: "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=400" }
             ];
 
             let html = '';
-            categories.forEach(cat => {
-                const item = cat.d[Math.floor(Math.random() * cat.d.length)];
+            defaultDatabase.forEach(item => {
                 html += `
                 <div class="res-card">
-                    <img src="${item.i}" alt="${cat.l}">
+                    <img src="${item.i}" alt="${item.l}">
                     <div class="res-info">
-                        <b>${cat.l}</b>
+                        <b>${item.l}</b>
                         <span>${item.t}</span>
                     </div>
                 </div>`;
@@ -224,21 +227,8 @@
             document.getElementById('results').innerHTML = html + `<button class="btn-analyze" onclick="location.reload()" style="grid-column: 1/-1">إعادة الاختبار (لعلك تنجو)</button>`;
         }
 
-        async function loadAd() {
-            try {
-                const res = await fetch(`${API_URL}/api/config`);
-                if (!res.ok) throw new Error('Not found');
-                const data = await res.json();
-                if(data.ad && data.ad.image) {
-                    document.getElementById('adImg').src = data.ad.image;
-                }
-            } catch(e) {
-                document.getElementById('adImg').src = "https://via.placeholder.com/800x200?text=أهلاً+بك+في+ألعاب+زمان";
-            }
-        }
-        
-        window.onload = loadAd;
+        // تشغيل الجلب عند تحميل الصفحة
+        window.onload = loadSiteData;
     </script>
 </body>
 </html>
-
