@@ -28,7 +28,7 @@
             overflow-x: hidden;
         }
 
-        /* الإعلان العلوي الثابت */
+        /* الإعلان العلوي المطور (Slider) */
         .ad-container {
             position: fixed;
             top: 0; left: 0;
@@ -42,7 +42,13 @@
             align-items: center;
             overflow: hidden;
         }
-        .ad-container img { height: 100%; width: auto; max-width: 100%; object-fit: contain; }
+        .ad-container img { 
+            height: 100%; 
+            width: auto; 
+            max-width: 100%; 
+            object-fit: contain; 
+            transition: opacity 0.8s ease-in-out; /* حركة ناعمة عند التبديل */
+        }
 
         .container { 
             max-width: 600px; 
@@ -124,7 +130,7 @@
 <body>
 
     <div class="ad-container" id="adBox">
-        <img id="adImg" src="https://via.placeholder.com/800x200?text=أهلاً+بك+في+ألعاب+زمان" alt="Ad">
+        <img id="adImg" src="https://via.placeholder.com/800x200?text=جاري+تحميل+نظام+الإعلانات" alt="Ad">
     </div>
 
     <div class="container">
@@ -152,26 +158,48 @@
 
     <script>
         const API_URL = window.location.origin;
+        let siteAds = [];
+        let siteContentImages = [];
+        let currentAdIndex = 0;
 
-        // دالة لجلب البيانات من السيرفر وتحديث الواجهة
-        async function loadSiteData() {
+        // 1. وظيفة جلب البيانات وبدء السلايدر
+        async function initSystem() {
             try {
                 const res = await fetch(`${API_URL}/api/config`);
                 const data = await res.json();
 
-                // 1. تحديث الإعلانات (عرض آخر إعلان نشط)
-                if (data.ads && data.ads.length > 0) {
-                    const latestAd = data.ads[data.ads.length - 1];
-                    document.getElementById('adImg').src = latestAd.image;
-                }
+                // تخزين البيانات المرفوعة من البوت
+                siteAds = data.ads || [];
+                siteContentImages = data.images || [];
 
-                // 2. تحديث صور الموقع (إذا تم رفع صور من خيارات أكثر)
-                if (data.images && data.images.length > 0) {
-                    // هنا يمكننا جعل الصور المرفوعة تظهر كجزء من المحتوى
-                    console.log("صور الموقع المتوفرة:", data.images);
+                // بدء تشغيل حركة الإعلانات إذا وجدت
+                if (siteAds.length > 0) {
+                    startAdSlider();
+                } else {
+                    document.getElementById('adImg').src = "https://via.placeholder.com/800x200?text=أهلاً+بك+في+ألعاب+زمان";
                 }
             } catch (e) {
                 console.log("Error loading data:", e);
+            }
+        }
+
+        // 2. وظيفة تحريك شريط الإعلانات تلقائياً
+        function startAdSlider() {
+            const adImg = document.getElementById('adImg');
+            
+            function updateAd() {
+                adImg.style.opacity = '0'; // تأثير تلاشي قبل التبديل
+                
+                setTimeout(() => {
+                    adImg.src = siteAds[currentAdIndex].image;
+                    adImg.style.opacity = '1';
+                    currentAdIndex = (currentAdIndex + 1) % siteAds.length;
+                }, 800);
+            }
+
+            updateAd(); // تشغيل الإعلان الأول فوراً
+            if (siteAds.length > 1) {
+                setInterval(updateAd, 5000); // تبديل كل 5 ثوانٍ
             }
         }
 
@@ -198,26 +226,31 @@
 
             setTimeout(() => {
                 clearInterval(timer);
-                renderUglyResults();
+                renderResults();
             }, 3500);
         }
 
-        function renderUglyResults() {
+        // 3. وظيفة عرض النتائج (تقرأ الصور المرفوعة من البوت)
+        function renderResults() {
+            // إذا لم يقم المدير برفع صور، استخدم الصور الافتراضية
             const defaultDatabase = [
-                { l: "وظيفة المستقبل", t: "منظف خزانات وقود", i: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
-                { l: "بيت الزوجية", t: "غرفة كرتون تحت الكبري", i: "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=400" },
-                { l: "سيارة الأحلام", t: "عربة كارو بدون حمار", i: "https://images.unsplash.com/photo-1590234141861-6893693e507b?w=400" },
-                { l: "شريك العمر", t: "شخصية نكدية جداً", i: "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=400" }
+                { name: "وظيفة المستقبل", url: "https://images.unsplash.com/photo-1581094288338-2314dddb7e8c?w=400" },
+                { name: "بيت الزوجية", url: "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=400" },
+                { name: "سيارة الأحلام", url: "https://images.unsplash.com/photo-1590234141861-6893693e507b?w=400" },
+                { name: "شريك العمر", url: "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=400" }
             ];
 
+            // نستخدم الصور المرفوعة من البوت، وإذا كانت فارغة نستخدم الافتراضية
+            const displayData = siteContentImages.length > 0 ? siteContentImages : defaultDatabase;
+
             let html = '';
-            defaultDatabase.forEach(item => {
+            displayData.forEach(item => {
                 html += `
                 <div class="res-card">
-                    <img src="${item.i}" alt="${item.l}">
+                    <img src="${item.url}" alt="${item.name}">
                     <div class="res-info">
-                        <b>${item.l}</b>
-                        <span>${item.t}</span>
+                        <b>${item.name}</b>
+                        <span>تم التحليل بناءً على ملامحك</span>
                     </div>
                 </div>`;
             });
@@ -227,8 +260,8 @@
             document.getElementById('results').innerHTML = html + `<button class="btn-analyze" onclick="location.reload()" style="grid-column: 1/-1">إعادة الاختبار (لعلك تنجو)</button>`;
         }
 
-        // تشغيل الجلب عند تحميل الصفحة
-        window.onload = loadSiteData;
+        // تشغيل النظام عند فتح الصفحة
+        window.onload = initSystem;
     </script>
 </body>
 </html>
