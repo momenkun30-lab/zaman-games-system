@@ -1,7 +1,7 @@
 {
   "name": "zaman-games",
   "version": "1.0.0",
-  "description": "نظام ألعاب الزمان",
+  "description": "Zaman Games System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
